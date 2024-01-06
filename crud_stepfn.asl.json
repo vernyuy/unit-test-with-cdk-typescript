@@ -1,0 +1,288 @@
+{
+  "Comment": "Amazon state language definition",
+  "StartAt": "InitState",
+  "States": {
+    "InitState": {
+      "Type": "Pass",
+      "Next": "Request Method"
+    },
+    "Request Method": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            {
+              "Variable": "$.requestContext.httpMethod",
+              "StringEquals": "GET"
+            },
+            {
+              "Variable": "$.requestContext.resourcePath",
+              "StringEquals": "/warehouses"
+            }
+          ],
+          "Next": "ListWarehouses"
+        },
+        {
+          "And": [
+            {
+              "Variable": "$.requestContext.httpMethod",
+              "StringEquals": "GET"
+            },
+            {
+              "Variable": "$.requestContext.resourcePath",
+              "StringEquals": "/products"
+            }
+          ],
+          "Next": "ListProducts"
+        },
+        {
+          "And": [
+            {
+              "Variable": "$.requestContext.httpMethod",
+              "StringEquals": "GET"
+            },
+            {
+              "Variable": "$.requestContext.resourcePath",
+              "StringEquals": "/product/{product_id}"
+            }
+          ],
+          "Next": "GetProduct"
+        },
+        {
+          "And": [
+            {
+              "Variable": "$.requestContext.httpMethod",
+              "StringEquals": "GET"
+            },
+            {
+              "Variable": "$.requestContext.resourcePath",
+              "StringEquals": "/warehouse/{warehouse_id}"
+            }
+          ],
+          "Next": "GetWarehouse"
+        },
+        {
+          "Variable": "$.requestContext.httpMethod",
+          "StringEquals": "POST",
+          "Next": "GenerateId"
+        }
+      ]
+    },
+    "ListWarehouses": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName": "InventoryUpdates",
+        "KeyConditionExpression": "PK = :pk AND begins_with(SK, :sk)",
+        "ExpressionAttributeValues": {
+          ":pk": {
+            "S": "WAREHOUSE"
+          },
+          ":sk": {
+            "S": "WAREHOUSE#"
+          }
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.All"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 1
+        }
+      ],
+      "ResultPath": "$.warehouses",
+      "End": true
+    },
+    "ListProducts": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName": "InventoryUpdates",
+        "IndexName": "product-index",
+        "KeyConditionExpression": "GSI1_PK = :gsi1_pk AND begins_with(GSI1_SK, :gsi1_sk)",
+        "ExpressionAttributeValues": {
+          ":gsi1_pk": {
+            "S": "PRODUCT"
+          },
+          ":gsi1_sk": {
+            "S": "PRODUCT#"
+          }
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.All"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 1
+        }
+      ],
+      "ResultPath": "$.products",
+      "End": true
+    },
+    "GetProduct": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName": "InventoryUpdates",
+        "IndexName": "product-index",
+        "KeyConditionExpression": "GSI1_PK = :gsi1_pk AND begins_with(GSI1_SK, :gsi1_sk)",
+        "ExpressionAttributeValues": {
+          ":gsi1_pk": {
+            "S": "PRODUCT"
+          },
+          ":gsi1_sk": {
+            "S.$": "States.Format('PRODUCT#{}', $.path.product_id)"
+          }
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.All"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 1
+        }
+      ],
+      "ResultPath": "$.product",
+      "End": true
+    },
+    "GetWarehouse": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName": "InventoryUpdates",
+        "KeyConditionExpression": "PK = :pk AND begins_with(SK, :sk)",
+        "ExpressionAttributeValues": {
+          ":pk": {
+            "S": "WAREHOUSE"
+          },
+          ":sk": {
+            "S.$": "States.Format('WAREHOUSE#{}', $.path.warehouse_id)"
+          }
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.All"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 1
+        }
+      ],
+      "ResultPath": "$.warehouse",
+      "End": true
+    },
+    "GenerateId": {
+      "Type": "Pass",
+      "Parameters": {
+        "id.$": "States.UUID()"
+      },
+      "ResultPath": "$.key",
+      "Next": "CreateChoice"
+    },
+
+    "CreateChoice":{
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.requestContext.resourcePath",
+          "StringEquals": "/product",
+          "Next": "CreateProduct"
+        },
+        {
+          "Variable": "$.requestContext.resourcePath",
+          "StringEquals": "/warehouse",
+          "Next": "CreateWarehouse"
+        }
+      ]
+    },
+    "CreateWarehouse": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName": "InventoryUpdates",
+        "Item": {
+          "PK": {
+            "S": "WAREHOUSE"
+          },
+          "SK": {
+            "S.$": "States.Format('WAREHOUSE#{}', $.key.id)"
+          },
+          "warehouseName": {
+            "S.$": "$.body.warehouseName"
+          },
+          "warehouseDescription": {
+            "S.$": "$.body.warehouseDescription"
+          },
+          "id": {
+            "S.$": "$.key.id"
+          },
+          "createdOn": {
+            "S.$": "$$.State.EnteredTime"
+          }
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:putItem",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.All"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 1
+        }
+      ],
+      "ResultPath": "$.products",
+      "End": true
+    },
+    "CreateProduct": {
+      "Type": "Task",
+      "Parameters": {
+        "TableName": "InventoryUpdates",
+        "Item": {
+          "PK": {
+            "S.$": "States.Format('WAREHOUSE#{}', $.body.warehouseId)"
+          },
+          "SK": {
+            "S.$": "States.Format('PRODUCT#{}', $.key.id)"
+          },
+          "productName": {
+            "S.$": "$.body.productName"
+          },
+          "productDescription": {
+            "S.$": "$.body.productDescription"
+          },
+          "productPrice": {
+            "N.$": "$.body.productPrice"
+          },
+          "id": {
+            "S.$": "$.key.id"
+          },
+          "categoryName": {
+            "S.$": "$.body.categoryName"
+          },
+          "productQuantity": {
+            "N.$": "$.body.productQuantity"
+          },
+          "createdOn": {
+            "S.$": "$$.State.EnteredTime"
+          },
+          "productImage": {
+            "S.$": "$.body.productImage"
+          },
+          "GSI1_PK": {
+            "S": "PRODUCT"
+          },
+          "GSI1_SK": {
+            "S.$": "States.Format('PRODUCT#{}', $.key.id)"
+          }
+        }
+      },
+      "Resource": "arn:aws:states:::aws-sdk:dynamodb:putItem",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.All"],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 1
+        }
+      ],
+      "ResultPath": "$.products",
+      "End": true
+    }
+  }
+}

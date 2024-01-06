@@ -1,0 +1,74 @@
+{
+  "Comment": "Amazon state language definition",
+  "StartAt": "InitState",
+  "States": {
+    "InitState": {
+      "Type": "Pass",
+      "Next": "ConsumeSqsMessage"
+    },
+    "ConsumeSqsMessage": {
+      "Type": "Map",
+      "ItemsPath": "$",
+      "Iterator": {
+        "StartAt": "ConvertStringToJson",
+        "States": {
+          "ConvertStringToJson": {
+            "Type": "Pass",
+            "Parameters": {
+              "Result.$": "States.StringToJson($.body)"
+            },
+            "ResultPath": "$.data",
+            "Next": "SaveItem"
+          },
+          "SaveItem": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:putItem",
+            "Parameters": {
+              "TableName": "InventoryUpdates",
+              "Item": {
+                "PK": {
+                  "S.$": "States.Format('WAREHOUSE#{}', $.data.Result.warehouseId)"
+                },
+                "SK": {
+                  "S.$": "States.Format('PRODUCT#{}', $.data.Result.productId)"
+                },
+                "productName": {
+                  "S.$": "$.data.Result.productName"
+                },
+                "productDescription": {
+                  "S.$": "$.data.Result.productDescription"
+                },
+                "productPrice": {
+                  "N.$": "$.data.Result.productPrice"
+                },
+                "id": {
+                  "S.$": "$.data.Result.productId"
+                },
+                "categoryName": {
+                  "S.$": "$.data.Result.categoryName"
+                },
+                "productQuantity": {
+                  "S.$": "$.data.Result.productQuantity"
+                },
+                "createdOn": {
+                  "S.$": "$.data.Result.createdOn"
+                },
+                "productImage":{
+                  "S.$": "$.data.Result.productImages"
+                },
+                "GSI1_PK": {
+                  "S": "PRODUCT"
+                },
+                "GSI1_SK": {
+                  "S.$": "States.Format('PRODUCT#{}', $.data.Result.productId)"
+                }
+              }
+            },
+            "End": true
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}
