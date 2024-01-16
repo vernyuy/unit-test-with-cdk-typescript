@@ -48,7 +48,7 @@
                   "S.$": "$.data.Result.categoryName"
                 },
                 "productQuantity": {
-                  "S.$": "$.data.Result.productQuantity"
+                  "N.$": "$.data.Result.productQuantity"
                 },
                 "createdOn": {
                   "S.$": "$.data.Result.createdOn"

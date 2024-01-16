@@ -1,0 +1,125 @@
+{
+    "Comment": "order processing",
+    "StartAt": "check inventory",
+    "States": {
+      "check inventory": {
+        "Type": "Task",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+            "TableName": "InventoryUpdates",
+            "IndexName": "product-index",
+            "KeyConditionExpression": "GSI1_PK = :gsi1_pk AND begins_with(GSI1_SK, :gsi1_sk)",
+            "ExpressionAttributeValues": {
+              ":gsi1_pk": {
+                "S": "PRODUCT"
+              },
+              ":gsi1_sk": {
+                "S.$": "States.Format('PRODUCT#{}', $.path.product_id)"
+              }
+            }
+          },
+          "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",   
+          "ResultPath": "$.product", 
+        "Next": "items available?"
+      },
+      "items available?": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.body.quantity",
+            "NumericGreaterThanPath": "$.product.productQuantity",
+            "Next": "cancel order"
+          }
+        ],
+        "Default": "Parallel"
+      },
+      "Parallel": {
+        "Type": "Parallel",
+        "Branches": [
+          {
+            "StartAt": "GenerateId",
+            "States": {
+                "GenerateId": {
+                    "Type": "Pass",
+                    "Parameters": {
+                      "id.$": "States.UUID()"
+                    },
+                    "ResultPath": "$.key",
+                    "Next": "SaveOrder"
+                  },
+                "SaveOrder": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::dynamodb:putItem",
+                    "Parameters": {
+                      "TableName": "InventoryUpdates",
+                      "Item": {
+                        "PK": {
+                          "S": "ORDER"
+                        },
+                        "SK": {
+                          "S.$": "States.Format('ORDER#{}', $.key.id)"
+                        },
+                        "orderStatus": {
+                          "S": "COMPLETED"
+                        },
+                        "id": {
+                          "S.$": "$.key.id"
+                        },
+                        "orderQuantity":{
+                            "S.$": "$.body.quantity"
+                        }
+                      }
+                    },
+                    "End": true
+                  }
+                }
+          },
+          {
+            "StartAt": "UpdateInventory",
+            "States": {
+                "UpdateInventory": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:states:::dynamodb:updateItem",
+                    "Parameters": {
+                      "TableName": "InventoryUpdates",
+                      "Key": {
+                        "PK": {
+                            "S.$": "States.Format('WAREHOUSE#{}', $.body.warehouseId)"
+                          },
+                          "SK": {
+                            "S.$": "States.Format('PRODUCT#{}', $.body.productId)"
+                          }
+                      },
+                      "UpdateExpression": "set productQuantity = :city",
+                      "ExpressionAttributeValues": {
+                        ":city": {
+                          "S.$": "States.MathAdd($.value1, $.step)"
+                        }
+                      },
+                      "ReturnValues": "UPDATED_NEW"
+                    },
+                    "End": true
+                  }
+            }
+          }
+        ],
+        "Next": "Success"
+      },
+      "Success": {
+        "Type": "Succeed"
+      },
+      "cancel order": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "OutputPath": "$.Payload",
+        "Parameters": {
+          "Payload.$": "$",
+          "FunctionName": "arn:aws:lambda:us-east-1:**********:function:updateOrder:$LATEST"
+        },
+        "Next": "Fail"
+      },
+      "Fail": {
+        "Type": "Fail"
+      }
+    }
+  }
