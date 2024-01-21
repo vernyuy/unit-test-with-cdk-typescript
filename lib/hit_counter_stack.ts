@@ -32,7 +32,7 @@ export class CdkWorkshopStack extends cdk.Stack {
 
     const helloWithCounter = new HitCounter(this, 'HelloHitCounter', {
       downstream: hello,
-      readCapacity: 5,
+      readCapacity: 15,
     });
 
     // defines an API Gateway REST API resource backed by our "hello" function.
