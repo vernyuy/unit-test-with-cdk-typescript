@@ -86,7 +86,7 @@ test('Lambda Has Environment Variables', () => {
           handler: 'hello.handler',
           code: lambda.Code.fromAsset('lib/lambda')
         }),
-        readCapacity: 2
+        readCapacity: 10
       });
     }).toThrow(/readCapacity must be greater than 5 and less than 20/);
   });
