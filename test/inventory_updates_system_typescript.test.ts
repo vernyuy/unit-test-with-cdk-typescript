@@ -12,7 +12,8 @@ test('DynamoDB Table Created', () => {
       runtime: lambda.Runtime.NODEJS_14_X,
       handler: 'hitcounter.handler',
       code: lambda.Code.fromAsset('lib/lambda')
-    })
+    }),
+    readCapacity: 10,
   });
   // THEN
 
@@ -29,7 +30,8 @@ test('Lambda Has Environment Variables', () => {
         runtime: lambda.Runtime.NODEJS_14_X,
         handler: 'hello.handler',
         code: lambda.Code.fromAsset('lib/lambda')
-      })
+      }),
+      readCapacity: 5
     });
     // THEN
     const template = Template.fromStack(stack);
@@ -61,7 +63,8 @@ test('Lambda Has Environment Variables', () => {
         runtime: lambda.Runtime.NODEJS_14_X,
         handler: 'hello.handler',
         code: lambda.Code.fromAsset('lib/lambda')
-      })
+      }),
+      readCapacity: 2
     });
     // THEN
     const template = Template.fromStack(stack);
@@ -83,7 +86,7 @@ test('Lambda Has Environment Variables', () => {
           handler: 'hello.handler',
           code: lambda.Code.fromAsset('lib/lambda')
         }),
-        readCapacity: 50
+        readCapacity: 2
       });
-    }).toThrowError(/readCapacity must be greater than 5 and less than 20/);
+    }).toThrow(/readCapacity must be greater than 5 and less than 20/);
   });

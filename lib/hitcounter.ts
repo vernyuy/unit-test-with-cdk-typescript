@@ -6,7 +6,7 @@ import { Construct } from 'constructs';
 export interface HitCounterProps {
   /** the function for which we want to count url hits **/
   downstream: lambda.IFunction;
-  readCapacity?: number;    
+  readCapacity: number;    
 }
 
 export class HitCounter extends Construct {
