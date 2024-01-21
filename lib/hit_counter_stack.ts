@@ -19,7 +19,7 @@ export class CdkWorkshopStack extends cdk.Stack {
           "vernyuy/unit-test-with-cdk-typescript",
           "master"
         ),
-        commands: ["npm ci", "npm run build", "npx cdk synth"],
+        commands: ["npm ci", "npm run build","npm run test", "npx cdk synth"],
       }),
     });
 
